@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Guide to Breast Tumors</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Harmony (Rose, Slate, Amber) -->
+    <!-- Application Structure Plan: A thematic, dashboard-style single-page application is used to transform the linear report into an exploratory experience. The structure now begins with: 1) An "Introduction" section, offering a high-level overview, key points, and foundational definitions of breast tumors, their detection, and prevalence. This is followed by: 2) A "Definition & Characteristics" section with interactive toggles to explore benign vs. malignant tumor specifics. 3) An interactive "Tumor Types" section with filterable cards and a comparative chart for molecular subtypes, including detailed benign and aggressive malignant types. 4) A "Risk & Prevention" section with toggles for modifiable/non-modifiable factors and prevention strategies. 5) A "Diagnosis & Treatment" section visualizing the patient journey with a process flow diagram, detailed steps for diagnosis (including tumor grading table) and treatment (including types of therapies). 6) A "Prognosis Explorer" dashboard with interactive charts and filters incorporating survival disparities by race/age, and a dedicated view for global statistics, trends, and a comprehensive analysis. This non-linear, task-oriented design allows users to dive into topics of interest, making complex information digestible and empowering user-led discovery, which is more effective for usability than a static report format. -->
+    <!-- Visualization & Content Choices: 1. Inform: Key points and overarching summaries are presented prominently in the new "Introduction" section. Detailed textual content for benign/malignant definitions, journey steps, risk factors, and prevention strategies is revealed on user interaction within specific sections. Global impact, statistics, and a comprehensive analysis are presented in a dedicated text view within the Prognosis Explorer. 2. Compare: An interactive toggle compares Benign vs. Malignant tumors at a high level. Chart.js bar charts with filters compare 5-year survival rates by molecular subtype, cancer stage, and demographic factors (race/age). The tumor grading table is presented as an HTML table within the dynamic diagnosis content. 3. Organize: Tumor types are organized into a filterable grid of cards. The patient journey is structured as a clear HTML/CSS process flow with expandable details for each step. 4. Relationships: The Prognosis Explorer allows cross-filtering between stage and demographic factors to show relationships in outcomes and disparities. All charts use Chart.js (Canvas), and all diagrams and tables use structured HTML/CSS, fulfilling the NO SVG/Mermaid requirement. This comprehensive approach directly supports the exploratory and informative structure of the application. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fdf2f8; /* rose-50 */
+            color: #334155; /* slate-700 */
+        }
+        .nav-link {
+            transition: color 0.3s ease, border-color 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #d62c80; /* custom pink */
+            border-bottom-color: #d62c80;
+        }
+        .content-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .content-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .tab-button {
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .tab-button.active {
+            background-color: #d62c80;
+            color: white;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 45vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .process-step {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        .process-step:not(:last-child)::after {
+            content: '→';
+            font-size: 1.5rem;
+            color: #d1d5db; /* gray-300 */
+            margin: 0 1rem;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Table styling for tumor grading */
+        .grade-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+        }
+        .grade-table th, .grade-table td {
+            border: 1px solid #e2e8f0; /* slate-200 */
+            padding: 0.75rem;
+            text-align: left;
+        }
+        .grade-table th {
+            background-color: #f8fafc; /* slate-50 */
+            font-weight: 600;
+        }
+        .detail-list {
+            list-style: disc;
+            padding-left: 1.5rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header & Navigation -->
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-[#d62c80]">Breast Tumor Explorer</h1>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#intro-overview" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Introduction</a>
+                        <a href="#detailed-overview" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Definition & Characteristics</a>
+                        <a href="#types" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Tumor Types</a>
+                        <a href="#risk" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Risk & Prevention</a>
+                        <a href="#journey" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Diagnosis & Treatment</a>
+                        <a href="#prognosis" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Prognosis</a>
+                        <a href="#ai-search" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">All AI Search</a>
+                        <a href="#contact" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Contact</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Section 0: Introduction -->
+        <section id="intro-overview" class="py-16 sm:py-24">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-left">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl text-center mb-8">Here’s a concise yet comprehensive overview of breast tumors:</h2>
+                
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Definition</h3>
+                <p class="mb-4 text-slate-600">
+                    A breast tumor is any abnormal growth of cells within breast tissue. Tumors can be <strong>benign</strong> (non-cancerous) or <strong>malignant</strong> (cancerous). While benign lesions don’t invade surrounding tissues or spread, malignant tumors (breast cancers) can invade locally and metastasize.
+                </p>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Epidemiology</h3>
+                <ul class="list-disc pl-5 text-slate-600 space-y-2">
+                    <li><strong>Incidence</strong>: Breast cancer is the most common cancer in women worldwide.</li>
+                    <li><strong>Age</strong>: Risk increases with age; most cases occur in women over 50, though younger women can be affected.</li>
+                    <li><strong>Gender</strong>: >99% occur in women, but men can develop breast cancer (~1% of cases).</li>
+                </ul>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Types of Breast Tumors</h3>
+                <table class="grade-table mx-auto my-4">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Common Entities</th>
+                            <th>Behavior</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Benign</td><td>Fibroadenoma, cysts, papilloma, lipoma</td><td>Well-circumscribed, non-invasive</td></tr>
+                        <tr><td>Malignant</td><td>Invasive ductal carcinoma (most common), invasive lobular carcinoma, ductal carcinoma in situ (DCIS)</td><td>Locally invasive; potential to metastasize</td></tr>
+                    </tbody>
+                </table>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Risk Factors</h3>
+                <ul class="list-disc pl-5 text-slate-600 space-y-2">
+                    <li><strong>Non-modifiable</strong>: Female sex; increasing age; family history (BRCA1/2 mutations); personal history of breast cancer or certain benign lesions; early menarche/late menopause</li>
+                    <li><strong>Modifiable</strong>: Hormone replacement therapy; alcohol use; obesity after menopause; lack of physical activity</li>
+                    <li><strong>Others</strong>: Radiation exposure to chest (esp. <30 years old); dense breast tissue</li>
+                </ul>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Clinical Presentation</h3>
+                <ul class="list-disc pl-5 text-slate-600 space-y-2">
+                    <li><strong>Benign lesions</strong>: Often painless, mobile “rubbery” masses (e.g., fibroadenoma); may fluctuate with cycle (cysts)</li>
+                    <li><strong>Malignant tumors</strong>: Painless, hard, irregular mass; skin changes (dimpling, peau d’orange); nipple changes (inversion, discharge, ulceration); axillary lymphadenopathy</li>
+                </ul>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Diagnostic Workup</h3>
+                <ul class="list-disc pl-5 text-slate-600 space-y-2">
+                    <li><strong>Clinical Exam</strong>: Inspection and palpation of breasts & regional nodes</li>
+                    <li><strong>Imaging</strong>:</li>
+                    <ul class="list-circle pl-5 mt-1 space-y-1">
+                        <li>Mammography: First-line for women ≥40; high sensitivity for calcifications and masses</li>
+                        <li>Ultrasound: Characterizes cystic vs solid lesions; adjunctive for dense breasts</li>
+                        <li>MRI: High sensitivity; used in high-risk screening or unclear cases</li>
+                    </ul>
+                    <li><strong>Tissue Diagnosis</strong>:</li>
+                    <ul class="list-circle pl-5 mt-1 space-y-1">
+                        <li>Core-needle biopsy (standard)</li>
+                        <li>Fine-needle aspiration (for cystic or nodal evaluation)</li>
+                        <li>Excisional biopsy (if core needle is nondiagnostic)</li>
+                    </ul>
+                </ul>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Staging (AJCC TNM)</h3>
+                <ul class="list-disc pl-5 text-slate-600 space-y-2">
+                    <li><strong>T</strong> (Tumor): size and/or extension into chest wall/skin</li>
+                    <li><strong>N</strong> (Nodes): number and location of positive lymph nodes</li>
+                    <li><strong>M</strong> (Metastasis): presence of distant spread</li>
+                    <li><strong>Stage 0–IV</strong>: Guides prognosis and treatment planning</li>
+                </ul>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Treatment Principles</h3>
+                <table class="grade-table mx-auto my-4">
+                    <thead>
+                        <tr>
+                            <th>Modality</th>
+                            <th>Indications</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Surgery</td><td>Lumpectomy (breast-conserving) or mastectomy; sentinel node biopsy or axillary dissection</td></tr>
+                        <tr><td>Radiation</td><td>After lumpectomy; post-mastectomy in high-risk cases</td></tr>
+                        <tr><td>Systemic Therapy</td><td>Depends on tumor subtype and stage:<br>Chemotherapy: e.g., anthracyclines, taxanes<br>Hormonal therapy: tamoxifen (premenopausal), aromatase inhibitors (postmenopausal)<br>Targeted therapy: HER2-directed (trastuzumab, pertuzumab)<br>Immunotherapy: for selected triple-negative tumors</td></tr>
+                    </tbody>
+                </table>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Prognosis</h3>
+                <ul class="list-disc pl-5 text-slate-600 space-y-2">
+                    <li><strong>Factors</strong>: Stage at diagnosis, tumor grade, hormone-receptor status, HER2 status, patient age, overall health</li>
+                    <li>Early-stage, receptor-positive cancers have the best outcomes; advanced/metastatic disease requires prolonged systemic management.</li>
+                </ul>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Screening & Prevention</h3>
+                <ul class="list-disc pl-5 text-slate-600 space-y-2">
+                    <li><strong>Mammography</strong>: Biennial (ages 50–74) or individualized risk-based earlier</li>
+                    <li><strong>Breast self-awareness</strong>: Report new lumps or changes promptly</li>
+                    <li><strong>Risk reduction</strong>: Genetic counseling/testing for high-risk; lifestyle modifications; chemoprevention (e.g., tamoxifen) in select cases; prophylactic surgery for BRCA carriers</li>
+                </ul>
+
+                <h3 class="text-2xl font-bold tracking-tight text-slate-800 mt-12 mb-4">Key Takeaway</h3>
+                <p class="mb-4 text-slate-600">
+                    Early detection through screening and timely biopsy of suspicious lesions dramatically improves outcomes. Multidisciplinary management—combining surgery, radiation, and systemic therapies tailored to tumor biology—is the cornerstone of effective breast cancer care.
+                </p>
+            </div>
+        </section>
+
+        <hr class="border-rose-200 w-1/2 mx-auto">
+
+        <!-- Section 1: Detailed Overview (formerly "Overview") -->
+        <section id="detailed-overview" class="py-16 sm:py-24">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl">Comprehensive Analysis of Breast Tumors</h2>
+                <p class="mt-4 max-w-3xl mx-auto text-lg text-slate-600">
+                    This section provides an in-depth exploration of breast tumors, encompassing both benign and malignant types, their characteristics, detection methods, and recent research advancements, based on current medical literature as of June 10, 2025. The analysis aims to offer a detailed understanding for healthcare professionals, researchers, and informed laypersons.
+                </p>
+
+                <div class="mt-12 max-w-4xl mx-auto">
+                    <div class="flex justify-center mb-8 rounded-full bg-rose-100 p-1">
+                        <button id="benign-btn" class="tab-button w-1/2 py-2 px-4 rounded-full text-sm font-semibold active">Benign Tumors Defined</button>
+                        <button id="malignant-btn" class="tab-button w-1/2 py-2 px-4 rounded-full text-sm font-semibold">Malignant Tumors Defined</button>
+                    </div>
+
+                    <div id="tumor-info-content" class="fade-in">
+                        <!-- Content will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <hr class="border-rose-200 w-1/2 mx-auto">
+
+        <!-- Section 2: Tumor Types -->
+        <section id="types" class="py-16 sm:py-24 bg-white">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl">Classification of Breast Tumors</h2>
+                    <p class="mt-4 max-w-3xl mx-auto text-lg text-slate-600">
+                        Breast tumors are categorized by their origin and characteristics. This section details both common benign types and various malignant (cancerous) forms, including their prevalence and unique features. Use the buttons to filter the tumor types and explore their specific descriptions.
+                    </p>
+                </div>
+                
+                <div class="flex justify-center mb-8 space-x-2 flex-wrap">
+                    <button class="filter-btn tab-button py-2 px-4 rounded-full text-sm font-semibold active mb-2" data-filter="all">All Types</button>
+                    <button class="filter-btn tab-button py-2 px-4 rounded-full text-sm font-semibold mb-2" data-filter="benign">Benign Tumors</button>
+                    <button class="filter-btn tab-button py-2 px-4 rounded-full text-sm font-semibold mb-2" data-filter="malignant">Malignant Tumors</button>
+                    <button class="filter-btn tab-button py-2 px-4 rounded-full text-sm font-semibold mb-2" data-filter="aggressive">Aggressive Subtypes</button>
+                </div>
+
+                <div id="tumor-types-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Tumor type cards will be dynamically inserted here -->
+                </div>
+
+                <div class="text-center mt-20">
+                     <h3 class="text-2xl font-bold tracking-tight text-slate-800 sm:text-3xl">Prognosis by Molecular Subtype</h3>
+                     <p class="mt-3 max-w-2xl mx-auto text-md text-slate-600">
+                        This chart compares the 5-year survival rates for different molecular subtypes of malignant tumors, which are key to determining treatment and understanding patient outcomes.
+                    </p>
+                </div>
+                <div class="mt-8">
+                    <div class="chart-container">
+                        <canvas id="subtypePrognosisChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <hr class="border-rose-200 w-1/2 mx-auto">
+
+        <!-- Section 3: Risk & Prevention -->
+        <section id="risk" class="py-16 sm:py-24">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl">Risk Factors & Prevention</h2>
+                    <p class="mt-4 max-w-3xl mx-auto text-lg text-slate-600">
+                        Understanding the factors that increase breast cancer risk is crucial for prevention and early detection. This section categorizes risks into those you cannot change (non-modifiable) and those you can influence (modifiable), alongside effective prevention strategies. Click on each card to learn more.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div>
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4 text-center">Risk Factors</h3>
+                        <div id="risk-factors-container" class="space-y-4">
+                            <!-- Risk factor cards will be dynamically inserted here -->
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold text-slate-800 mb-4 text-center">Prevention Strategies</h3>
+                        <div id="prevention-container" class="space-y-4">
+                            <!-- Prevention cards will be dynamically inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <hr class="border-rose-200 w-1/2 mx-auto">
+
+        <!-- Section 4: Diagnosis & Treatment Journey -->
+        <section id="journey" class="py-16 sm:py-24 bg-white">
+             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl">The Patient Journey</h2>
+                    <p class="mt-4 max-w-3xl mx-auto text-lg text-slate-600">
+                       From initial symptoms and screening to definitive diagnosis and comprehensive treatment, the path for a breast cancer patient is a multi-step process. This section illustrates the typical journey, providing details on each phase, including imaging, biopsy, tumor grading, and various therapeutic approaches. Click on each step to see detailed information about the procedures and therapies involved.
+                    </p>
+                </div>
+                <div class="flex flex-col md:flex-row justify-center items-center flex-wrap mb-8">
+                    <button class="journey-btn m-2 process-step p-4 rounded-lg bg-rose-100 hover:bg-rose-200" data-content="symptoms">Symptoms & Screening</button>
+                    <button class="journey-btn m-2 process-step p-4 rounded-lg bg-rose-100 hover:bg-rose-200" data-content="diagnosis">Diagnosis</button>
+                    <button class="journey-btn m-2 process-step p-4 rounded-lg bg-rose-100 hover:bg-rose-200" data-content="treatment">Treatment</button>
+                </div>
+                <div id="journey-content-display" class="content-card p-6 mt-8 max-w-4xl mx-auto min-h-[200px] fade-in text-left">
+                    <!-- Journey content will be dynamically inserted here -->
+                </div>
+             </div>
+        </section>
+
+        <hr class="border-rose-200 w-1/2 mx-auto">
+
+        <!-- Section 5: Prognosis Explorer -->
+        <section id="prognosis" class="py-16 sm:py-24">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl">Prognosis Explorer</h2>
+                    <p class="mt-4 max-w-3xl mx-auto text-lg text-slate-600">
+                        Survival rates provide a statistical picture of patient outcomes, significantly influenced by the stage of cancer at diagnosis and other factors. This interactive dashboard visualizes 5-year overall survival rates and highlights disparities across different demographic groups. Use the filters to explore how outcomes vary.
+                    </p>
+                </div>
+
+                <div class="flex justify-center mb-8 space-x-2 flex-wrap">
+                    <button class="prognosis-filter-btn tab-button py-2 px-4 rounded-full text-sm font-semibold active mb-2" data-filter="overall">Overall by Stage</button>
+                    <button class="prognosis-filter-btn tab-button py-2 px-4 rounded-full text-sm font-semibold mb-2" data-filter="disparities">Disparities (Race/Age)</button>
+                    <button class="prognosis-filter-btn tab-button py-2 px-4 rounded-full text-sm font-semibold mb-2" data-filter="statistics">Statistics & Analysis</button>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="prognosisChart"></canvas>
+                </div>
+                <p id="prognosis-chart-title" class="text-center mt-4 font-semibold text-slate-700"></p>
+                <div id="prognosis-text-content" class="mt-8 text-slate-600 text-left max-w-4xl mx-auto">
+                    <!-- Text content for statistics and trends will be inserted here -->
+                </div>
+            </div>
+        </section>
+
+        <hr class="border-rose-200 w-1/2 mx-auto">
+
+        <!-- Section 6: All AI Search -->
+        <section id="ai-search" class="py-16 sm:py-24">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-left">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl text-center mb-8">All AI Search</h2>
+                <p class="mt-4 max-w-3xl mx-auto text-lg text-slate-600 text-center">
+                    This section is reserved for content related to "All AI Search". You can add information here about how AI is used in breast cancer research, diagnosis, or how users can leverage AI-powered search tools for further information.
+                </p>
+            </div>
+        </section>
+
+        <hr class="border-rose-200 w-1/2 mx-auto">
+
+        <!-- Section 7: Contact Information -->
+        <section id="contact" class="py-16 sm:py-24">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-left">
+                <h2 class="text-3xl font-bold tracking-tight text-slate-800 sm:text-4xl text-center mb-8">Contact Information</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">Vishal Hospital</h3>
+                        <p class="text-slate-600 mb-2"><strong>Address:</strong> Vishal hospital, Kailashwadi Main Road, opposite Taluka Polish Choki, Junction Plot, Rajkot, Gujarat 360001</p>
+                        <p class="text-slate-600 mb-2"><strong>Mobile Number:</strong> 9228105245</p>
+                        <p class="text-slate-600 mb-2"><strong>Landline Number:</strong> 0281-2450408</p>
+                        <p class="text-slate-600"><strong>Website:</strong> <a href="https://vishalhospitalrajkot.github.io/" target="_blank" class="text-pink-600 hover:underline">vishalhospitalrajkot.github.io/</a></p>
+                    </div>
+
+                    <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">Vishal Banquet Hall</h3>
+                        <p class="text-slate-600 mb-2"><strong>Address:</strong> vishal banquet hall, Gaya-Dobhi Rd, Musatpura, Bihar 823004</p>
+                        <p class="text-slate-600 mb-2"><strong>Mobile Number:</strong> 9228105245</p>
+                        <p class="text-slate-600"><strong>Website:</strong> <a href="https://vishalbanquethall1.github.io/" target="_blank" class="text-pink-600 hover:underline">vishalbanquethall1.github.io/</a></p>
+                    </div>
+
+                    <div class="content-card p-6">
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">Dr. Anoop Lal Sinha</h3>
+                        <p class="text-slate-600 mb-2"><strong>Mobile Number:</strong> 9228105245</p>
+                        <p class="text-slate-600"><strong>Website:</strong> <a href="https://vishalhospitalrajkot.github.io/Dr.AnoopLalSinha/" target="_blank" class="text-pink-600 hover:underline">vishalhospitalrajkot.github.io/Dr.AnoopLalSinha/</a></p>
+                    </div>
+
+                    <div class="content-card p-6 col-span-full text-center">
+                        <h3 class="text-xl font-bold text-slate-800 mb-4">Translate this page with Google Translate:</h3>
+                        <div class="flex flex-wrap justify-center space-x-4">
+                            <a href="https://translate.google.com/translate?sl=auto&tl=en&u=https://57w5ajvt2bukwn48d5ha2rqm5p0xfhikr0mrrnxez2q27pp3y5-h766678603.scf.usercontent.goog/e557342b-3706-4809-8612-7a079ab3f736" target="_blank" class="inline-block bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2 px-4 rounded-full transition duration-300 ease-in-out mb-2">Translate to English</a>
+                            <a href="https://translate.google.com/translate?sl=auto&tl=hi&u=https://57w5ajvt2bukwn48d5ha2rqm5p0xfhikr0mrrnxez2q27pp3y5-h766678603.scf.usercontent.goog/e557342b-3706-4809-8612-7a079ab3f736" target="_blank" class="inline-block bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2 px-4 rounded-full transition duration-300 ease-in-out mb-2">Translate to Hindi</a>
+                            <a href="https://translate.google.com/translate?sl=auto&tl=gu&u=https://57w5ajvt2bukwn48d5ha2rqm5p0xfhikr0mrrnxez2q27pp3y5-h766678603.scf.usercontent.goog/e557342b-3706-4809-8612-7a079ab3f736" target="_blank" class="inline-block bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2 px-4 rounded-full transition duration-300 ease-in-out mb-2">Translate to Gujarati</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    
+    <footer class="bg-slate-800 text-white mt-16">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
+            <p>This interactive guide is for informational purposes only and does not constitute medical advice. Consult with a healthcare professional for any health concerns.</p>
+            <p class="mt-2 text-sm text-slate-400">Data synthesized from "A Comprehensive Review of Breast Tumors" and current medical literature as of June 10, 2025.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            const data = {
+                tumorInfo: {
+                    benign: {
+                        title: 'Benign Breast Tumors',
+                        description: 'Benign tumors are non-cancerous growths that do not spread to other parts of the body. They are usually not life-threatening but can cause discomfort if they grow large and press on surrounding tissues. Common types include fibroadenomas and cysts. While most do not increase cancer risk, some conditions like atypical hyperplasia may.',
+                        characteristics: [
+                            { name: 'Growth Pattern', value: 'Localized, often slow-growing, does not invade' },
+                            { name: 'Spread Potential', value: 'Does not spread (metastasize)' },
+                            { name: 'Life-Threatening', value: 'Generally not' },
+                            { name: 'Future Cancer Risk', value: 'Most types do not; atypical hyperplasia increases risk' }
+                        ]
+                    },
+                    malignant: {
+                        title: 'Malignant Breast Tumors (Breast Cancer)',
+                        description: 'Malignant tumors are cancerous. Their cells grow uncontrollably, invade surrounding healthy tissue, and can metastasize (spread) to other organs. They are life-threatening, especially if metastatic. Breast cancer is the most common cancer in women worldwide, with approximately 2.3 million new cases diagnosed in 2022 and 670,000 deaths globally.',
+                        characteristics: [
+                            { name: 'Growth Pattern', value: 'Invasive and uncontrolled growth' },
+                            { name: 'Spread Potential', value: 'High potential for metastasis' },
+                            { name: 'Life-Threatening', value: 'Can be, especially if metastatic' },
+                            { name: 'Future Cancer Risk', value: 'Is a primary cancer' }
+                        ]
+                    }
+                },
+                tumorTypes: [
+                    { name: 'Fibrocystic Changes', category: 'benign', desc: 'Affects 50–60% of women; involves fluid-filled cysts and fibrous lumps, often linked to hormonal changes. May worsen with caffeine. These are benign and do not spread.', molecular_type: 'N/A' },
+                    { name: 'Fibroadenomas', category: 'benign', desc: 'Solid, mobile lumps of glandular/fibrous tissue; most common in women aged 18–35. Generally do not increase cancer risk. Benign.', molecular_type: 'N/A' },
+                    { name: 'Papillomas', category: 'benign', desc: 'Wart-like growths in milk ducts causing nipple discharge. Benign.', molecular_type: 'N/A' },
+                    { name: 'Ductal Carcinoma In Situ (DCIS)', category: 'malignant', desc: 'Non-invasive cancer, confined to milk ducts. Considered Stage 0 breast cancer, early detection possible through screening.', molecular_type: 'Early Stage' },
+                    { name: 'Invasive Ductal Carcinoma (IDC)', category: 'malignant', desc: 'Most common type (70–80% of cases); starts in a milk duct, breaks through the wall, and invades breast tissue. Spreads beyond ducts.', molecular_type: 'Invasive' },
+                    { name: 'Invasive Lobular Carcinoma (ILC)', category: 'malignant', desc: 'Second most common (10–15% of cases); starts in milk-producing lobules and grows in lines rather than lumps, spreading to surrounding tissues.', molecular_type: 'Invasive' },
+                    { name: 'Triple-Negative Breast Cancer (TNBC)', category: 'aggressive', desc: 'Lacks estrogen, progesterone, and HER2 receptors; more common in younger women, Black/Hispanic populations, and BRCA1 carriers. It is an aggressive subtype.', molecular_type: 'TNBC' },
+                    { name: 'Inflammatory Breast Cancer (IBC)', category: 'aggressive', desc: 'Rare (1–5%); causes red, swollen skin resembling an infection due to blocked lymph vessels. Very aggressive.', molecular_type: 'Aggressive' },
+                    { name: 'Paget\'s Disease of the Nipple', category: 'aggressive', desc: 'A rare cancer affecting the skin of the nipple and areola, often with an underlying cancer. Less common but potentially more serious.', molecular_type: 'Aggressive' },
+                ],
+                riskFactors: [
+                    { title: 'Non-Modifiable Risks', description: 'Factors you cannot change, such as increasing age (>55), genetics (BRCA1/2 mutations), and strong family history. Dense breast tissue and early menarche also contribute. Roughly half of cases in women over 40 have no identifiable risk beyond gender and age.', type: 'non-modifiable' },
+                    { title: 'Modifiable Risks', description: 'Lifestyle-related factors you can influence, including alcohol consumption, being overweight (especially after menopause), physical inactivity, and certain hormone therapies (e.g., combined estrogen and progestin).', type: 'modifiable' }
+                ],
+                preventionStrategies: [
+                    { title: 'Healthy Lifestyle', description: 'Maintain a healthy weight, be physically active, limit alcohol consumption, and adopt a diet rich in fruits and vegetables. These steps can reduce overall risk.' },
+                    { title: 'Screening', description: 'Regular mammograms (typically from age 40–50 depending on guidelines) are crucial for early detection. Breast self-exams can help with "breast awareness" but are not a substitute for mammograms.' },
+                    { title: 'High-Risk Strategies', description: 'For those with very high inherited risk (e.g., strong family history or known BRCA mutations), options include genetic counseling, preventive surgery (e.g., prophylactic mastectomy), or estrogen-blocking medications (chemoprevention).' }
+                ],
+                journeyContent: {
+                    symptoms: {
+                        title: 'Symptoms & Screening',
+                        text: 'Early breast cancer often has no symptoms, highlighting the importance of screening. Common signs include a new lump or thickening (often hard, painless, and unilateral), changes in breast size or shape, skin changes (dimpling, redness, orange-peel texture), or nipple changes (inversion, clear/bloody discharge). Benign lumps are often mobile and may change with menstrual cycles. Screening mammography is the primary tool for early detection, finding cancer before symptoms appear and significantly reducing mortality risk.',
+                    },
+                    diagnosis: {
+                        title: 'Diagnosis Process & Tumor Grading',
+                        text: 'Diagnosis is a multi-step process beginning with a clinical exam and imaging like diagnostic mammogram, ultrasound, or MRI. Ultrasound is useful for distinguishing solid masses from cysts, especially in dense breasts. If an abnormality is found, a biopsy (e.g., ultrasound-guided core biopsy) is the only definitive way to confirm cancer. A pathologist analyzes the tissue to identify cancer type, molecular characteristics (ER, PR, HER2 status), and assigns a tumor grade. This grading is distinct from staging, which describes the extent of cancer spread, with stages ranging from 0 (non-invasive) to IV (metastatic):',
+                        table: `
+                            <table class="grade-table">
+                                <thead>
+                                    <tr>
+                                        <th>Grade</th>
+                                        <th>Description</th>
+                                        <th>Aggressiveness</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Low (1)</td><td>Well-differentiated</td><td>Least aggressive</td></tr>
+                                    <tr><td>Medium (2)</td><td>Moderately differentiated</td><td>Moderate</td></tr>
+                                    <tr><td>High (3)</td><td>Poorly differentiated</td><td>Most aggressive</td></tr>
+                                </tbody>
+                            </table>
+                        `
+                    },
+                    treatment: {
+                        title: 'Treatment Modalities',
+                        text: 'Treatment is highly personalized, guided by cancer type, stage, and molecular profile. Benign tumors are typically monitored or surgically removed if symptomatic. For malignant tumors, treatment often combines several approaches, which are more effective and tolerated when started early and completed:',
+                        details: [
+                            { name: 'Surgery', description: 'Lumpectomy (tumor removal with surrounding tissue) or Mastectomy (full breast removal), sometimes with lymph node removal.' },
+                            { name: 'Adjuvant Therapies', description: 'Treatments given after primary therapy (surgery) to kill remaining cancer cells: Radiation (targets locally), Chemotherapy (kills fast-growing cells systemically), Hormone Therapy (for ER+/PR+ tumors, blocks hormone effects, e.g., tamoxifen), Targeted Therapy (e.g., trastuzumab for HER2+ cancers, targets specific cancer pathways), and Immunotherapy (especially for TNBC, boosts the body\'s immune response). Endocrine therapies reduce recurrence by nearly half for hormone-positive cancers, potentially causing menopause symptoms.' }
+                        ]
+                    }
+                },
+                subtypePrognosisData: {
+                    labels: ['HR+/HER2- (Luminal A)', 'HR+/HER2+ (Luminal B)', 'HR-/HER2+', 'Triple-Negative (TNBC)'],
+                    datasets: [{
+                        label: '5-Year Breast Cancer-Specific Survival',
+                        data: [95.5, 94.1, 89.3, 83.1],
+                        backgroundColor: ['#fb923c', '#facc15', '#a3e635', '#db2777'],
+                        borderColor: ['#f97316', '#eab308', '#84cc16', '#be185d'],
+                        borderWidth: 1
+                    }]
+                },
+                prognosisChartData: {
+                    overall: { 
+                        title: '5-Year Overall Survival Rate by Stage',
+                        labels: ['Localized', 'Regional', 'Distant'], 
+                        data: [99, 87, 32],
+                        backgroundColor: '#fb923c',
+                        borderColor: '#f97316'
+                    },
+                    disparities: { 
+                        title: '5-Year Overall Survival Rate: Disparities by Race/Ethnicity & Age',
+                        labels: ['White', 'Black', 'AAPI', 'Hispanic', 'Age <45', 'Age 45-54', 'Age 55-64', 'Age 65-74', 'Age 75+'], 
+                        data: [93, 84, 92, 88, 88, 91, 92, 92, 86],
+                        backgroundColor: ['#a3e635', '#db2777', '#facc15', '#4ade80', '#fb923c', '#a3e635', '#db2777', '#facc15', '#4ade80'], 
+                        borderColor: ['#84cc16', '#be185d', '#eab308', '#22c55e', '#f97316', '#84cc16', '#be185d', '#eab308', '#22c55e']
+                    },
+                    statistics: {
+                        title: 'Survey Note: Comprehensive Analysis of Breast Tumors',
+                        text: `
+                            <p class="mb-4">This section provides a detailed exploration of breast tumors, covering definitions, types, symptoms, diagnosis, and related considerations, drawing from authoritative sources to ensure accuracy and depth. The information is呈in a professional, article-like style, expanding on the direct answer to offer a thorough understanding for readers seeking comprehensive insights.</p>
+
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Definition and Classification</h4>
+                            <p class="mb-4">A breast tumor is defined as an abnormal mass of tissue within the breast, characterized by uncontrolled cell growth. According to the <a href="https://www.nationalbreastcancer.org/breast-tumors/" class="text-pink-600 hover:underline" target="_blank">National Breast Cancer Foundation: Breast Tumors</a>, tumors are classified into two primary categories: benign (non-cancerous) and malignant (cancerous). This classification is critical for determining the appropriate medical approach, as benign tumors do not typically pose a threat to life, while malignant tumors can metastasize, spreading to other parts of the body via the lymph system or bloodstream.</p>
+                            <ul class="detail-list mb-4">
+                                <li><strong>Benign Tumors</strong>: These are non-cancerous growths that do not invade surrounding tissues or spread. The <a href="https://www.nationalbreastcancer.org/breast-tumors/" class="text-pink-600 hover:underline" target="_blank">National Breast Cancer Foundation: Breast Tumors</a> notes that benign tumors are usually monitored rather than removed, unless they grow and cause pain or complications by pressing on adjacent tissue. Examples include fibroadenomas, which are common and often benign.</li>
+                                <li><strong>Malignant Tumors</strong>: These are cancerous and can be aggressive, invading and damaging surrounding tissue. The same source highlights that a biopsy is typically performed to assess the severity or aggressiveness of a suspected malignant tumor, which is essential for staging and treatment planning.</li>
+                            </ul>
+
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Tumor Grading for Malignant Cases</h4>
+                            <p class="mb-4">For malignant breast tumors, a grading system (1-3) is used to classify their severity, based on factors such as histologic grade, nuclear grade, and cell division rate. The <a href="https://www.nationalbreastcancer.org/breast-tumors/" class="text-pink-600 hover:underline" target="_blank">National Breast Cancer Foundation: Breast Tumors</a> details a scale from 1 to 3:</p>
+                            <ul class="detail-list mb-4">
+                                <li><strong>Grade 1 (Low Grade)</strong>: Well-differentiated, indicating slower growth and better prognosis.</li>
+                                <li><strong>Grade 2 (Intermediate Grade)</strong>: Moderately differentiated, with moderate growth potential.</li>
+                                <li><strong>Grade 3 (High Grade)</strong>: Poorly differentiated, suggesting rapid growth and higher likelihood of spread.</li>
+                            </ul>
+                            <p class="mb-4">It is emphasized that lower grades generally correlate with better recovery chances, though recovery is possible across all grades and stages. Importantly, tumor grades should not be confused with cancer stages, which assess the extent of disease spread. For further details on staging, refer to the <a href="https://www.nationalbreastcancer.org/about-breast-cancer/breast-cancer-staging/" class="text-pink-600 hover:underline" target="_blank">National Breast Cancer Foundation: Breast Cancer Staging</a>.</p>
+
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Symptoms and Detection Methods</h4>
+                            <p class="mb-4">Symptoms of breast cancer, as outlined by the <a href="https://my.clevelandclinic.org/health/diseases/3986-breast-cancer" class="text-pink-600 hover:underline" target="_blank">Cleveland Clinic: Breast Cancer</a>, include a new lump in the breast, which is the most common sign, often painless, hard, and with irregular edges. Other symptoms may include swelling or pain in the breast, dimpling, thickening, redness, or dryness of the skin, and changes such as nipple inversion or unusual discharge. However, the <a href="https://www.who.int/news-room/fact-sheets/detail/breast-cancer" class="text-pink-600 hover:underline" target="_blank">World Health Organization: Breast Cancer</a> and other sources note that many breast cancers are detected through screening, such as mammography, before symptoms manifest, particularly in developed regions with routine screening programs.</p>
+                            <p class="mb-4">The importance of early detection cannot be overstated, as the <a href="https://www.nationalbreastcancer.org/breast-tumors/" class="text-pink-600 hover:underline" target="_blank">National Breast Cancer Foundation: Breast Tumors</a> underscores that without screening, breast cancer is often identified as a palpable mass, which may indicate a later stage. This highlights the role of regular check-ups, especially for women over 50, though younger women and men can also be affected, with approximately 0.5–1% of breast cancers occurring in men, as per the WHO.</p>
+
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Prevalence and Statistics</h4>
+                            <p class="mb-4">Breast cancer, arising from malignant breast tumors, is the most common cancer diagnosed in women, following skin cancer. According to the National Breast Cancer Foundation, in 2025, an estimated 316,950 women in the U.S. will be diagnosed with invasive breast cancer, and 59,080 with non-invasive (in situ) breast cancer (<a href="https://www.nationalbreastcancer.org/breast-cancer-facts/" class="text-pink-600 hover:underline" target="_blank">Breast Cancer Facts & Stats 2024</a>). Additionally, an estimated 42,170 women will die from breast cancer in 2025, highlighting its significant impact. However, with over 4 million survivors in the U.S., advancements in treatment and early detection have improved outcomes.</p>
+                            <p class="mb-4">The risk of recurrence depends on the type and stage of the initial cancer, with the highest risk typically occurring within the first few years post-treatment, decreasing over time. These statistics underscore the importance of awareness and regular screening.</p>
+
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Recent Research and Advances</h4>
+                            <p class="mb-4">Recent studies have focused on improving treatment options and understanding breast tumor biology. Notable advancements include:</p>
+                            <ul class="detail-list mb-4">
+                                <li><strong>New Treatments</strong>: Antibody-drug conjugates like Datopotamab deruxtecan (Datroway) and Trastuzumab deruxtecan (Enhertu) have shown efficacy in metastatic breast cancers. Datopotamab deruxtecan received FDA approval in 2025 for ER-positive metastatic breast cancer, with clinical trials showing longer progression-free survival compared to chemotherapy (<a href="https://www.cancer.gov/types/breast/research" class="text-pink-600 hover:underline" target="_blank">Advances in Breast Cancer Research - NCI</a>). Trastuzumab deruxtecan, initially for HER2-positive cancers, was extended for use in cancers with low HER2 levels based on 2024 studies.</li>
+                                <li><strong>Immunotherapy and Tumor Microenvironment</strong>: Research at Fred Hutchinson Cancer Center, funded in 2024, is investigating the tumor immune microenvironment (TIME) to enhance responses to immune checkpoint inhibitors, particularly for triple-negative breast cancer, where response rates are low (around 20%) (<a href="https://www.fredhutch.org/en/news/center-news/2024/11/new-funding-drives-six-breast-cancer-studies--.html" class="text-pink-600 hover:underline" target="_blank">New funding drives six breast cancer studies | Fred Hutchinson Cancer Center</a>).</li>
+                                <li><strong>Imaging and Early Detection</strong>: The American Cancer Society notes efforts to develop tests that predict neoadjuvant treatment efficacy without imaging and detect cancer before it’s visible on mammograms, potentially revolutionizing early detection (<a href="https://www.cancer.org/cancer/types/breast-cancer/about/whats-new-in-breast-cancer-research.html" class="text-pink-600 hover:underline" target="_blank">What’s New in Breast Cancer Research? | American Cancer Society</a>).</li>
+                                <li><strong>Tumor Morphology and Prognosis</strong>: Breast Cancer Research published a 2025 study on tumor morphological complexity, linking it to treatment response and prognosis, offering new ways to quantify tumor behavior (<a href="https://breast-cancer-research.biomedcentral.com/articles" class="text-pink-600 hover:underline" target="_blank">Articles | Breast Cancer Research</a>).</li>
+                            </ul>
+                            <p class="mb-4">These advancements indicate a dynamic field, with ongoing efforts to tailor treatments and improve patient outcomes, particularly for aggressive subtypes like triple-negative breast cancer.</p>
+
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Public and Personal Perspectives</h4>
+                            <p class="mb-4">Discussions on X provide insight into public awareness and personal experiences. For instance, an X post by @OGreat6 on June 5, 2025, highlighted key breast cancer symptoms, such as lumps and skin changes, emphasizing the importance of self-examination (<a href="https://x.com/OGreat6/status/1930683404716019841" class="text-pink-600 hover:underline" target="_blank">Green Tea</a>). Another post by @TbirdTmoney on the same day shared a personal story of tumor confirmation and treatment, reflecting the impact of community support and alternative therapies (<a href="https://x.com/TbirdTmoney/status/1930433808118988803" class="text-pink-600 hover:underline" target="_blank">Blue Sky</a>). Medical professionals, like @JCandidoXavier, shared case studies, such as a granular cell tumor, on June 9, 2025, contributing to professional discourse (<a href="https://x.com/JCandidoXavier/status/1932141537166602565" class="text-pink-600 hover:underline" target="_blank">Red Wine</a>). These posts illustrate the ongoing conversation around breast tumors, blending medical insights with personal narratives.</p>
+
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Additional Resources</h4>
+                            <p class="mb-4">For further reading, resources like the National Breast Cancer Foundation offer free eBooks, such as “Breast Problems That Aren’t Breast Cancer,” providing information on benign conditions (<a href="https://www.nationalbreastcancer.org/breast-tumors/" class="text-pink-600 hover:underline" target="_blank">National Breast Cancer Foundation: Breast Tumors</a>). The WHO also provides fact sheets on breast cancer, updated in 2024, covering global initiatives (<a href="https://www.who.int/news-room/fact-sheets/detail/breast-cancer" class="text-pink-600 hover:underline" target="_blank">Breast cancer - WHO</a>).</p>
+                            <p class="mb-4">This comprehensive overview ensures all aspects of breast tumors are addressed, from basic definitions to cutting-edge research, supporting informed understanding and awareness.</p>
+
+                            <h4 class="text-xl font-bold text-slate-800 mb-2">Key Citations</h4>
+                            <ul class="detail-list mb-4">
+                                <li><a href="https://www.nationalbreastcancer.org/breast-tumors/" class="text-pink-600 hover:underline" target="_blank">Breast Tumors National Breast Cancer Foundation</a></li>
+                                <li><a href="https://www.mayoclinic.org/diseases-conditions/breast-cancer/symptoms-causes/syc-20352470" class="text-pink-600 hover:underline" target="_blank">Breast Cancer Symptoms and Causes Mayo Clinic</a></li>
+                                <li><a href="https://www.cancer.gov/types/breast/research" class="text-pink-600 hover:underline" target="_blank">Advances in Breast Cancer Research NCI</a></li>
+                                <li><a href="https://www.nationalbreastcancer.org/breast-cancer-facts/" class="text-pink-600 hover:underline" target="_blank">Breast Cancer Facts & Stats 2024 National Breast Cancer Foundation</a></li>
+                                <li><a href="https://www.fredhutch.org/en/news/center-news/2024/11/new-funding-drives-six-breast-cancer-studies--.html" class="text-pink-600 hover:underline" target="_blank">New funding drives six breast cancer studies | Fred Hutchinson Cancer Center</a></li>
+                                <li><a href="https://www.cancer.org/cancer/types/breast-cancer/about/whats-new-in-breast-cancer-research.html" class="text-pink-600 hover:underline" target="_blank">What’s New in Breast Cancer Research | American Cancer Society</a></li>
+                                <li><a href="https://breast-cancer-research.biomedcentral.com/articles" class="text-pink-600 hover:underline" target="_blank">Articles | Breast Cancer Research</a></li>
+                                <li><a href="https://www.who.int/news-room/fact-sheets/detail/breast-cancer" class="text-pink-600 hover:underline" target="_blank">Breast cancer - WHO</a></li>
+                                <li><a href="https://x.com/OGreat6/status/1930683404716019841" class="text-pink-600 hover:underline" target="_blank">Green Tea X post by OGreat6</a></li>
+                                <li><a href="https://x.com/TbirdTmoney/status/1930433808118988803" class="text-pink-600 hover:underline" target="_blank">Blue Sky X post by TbirdTmoney</a></li>
+                                <li><a href="https://x.com/JCandidoXavier/status/1932141537166602565" class="text-pink-600 hover:underline" target="_blank">Red Wine X post by JCandidoXavier</a></li>
+                            </ul>
+                        `
+                    }
+                }
+            };
+            
+            // Section 1: Detailed Overview (formerly "Overview")
+            const benignBtn = document.getElementById('benign-btn');
+            const malignantBtn = document.getElementById('malignant-btn');
+            const tumorInfoContent = document.getElementById('tumor-info-content');
+
+            function renderTumorInfo(type) {
+                const info = data.tumorInfo[type];
+                let characteristicsHtml = info.characteristics.map(char => `
+                    <div class="flex justify-between py-2 border-b border-rose-100">
+                        <span class="font-semibold text-slate-600">${char.name}</span>
+                        <span class="text-slate-800">${char.value}</span>
+                    </div>
+                `).join('');
+
+                tumorInfoContent.innerHTML = `
+                    <div class="content-card p-6 md:p-8 text-left">
+                        <h3 class="text-2xl font-bold text-slate-800 mb-2">${info.title}</h3>
+                        <p class="text-slate-600 mb-6">${info.description}</p>
+                        <div class="space-y-2">${characteristicsHtml}</div>
+                    </div>
+                `;
+            }
+
+            benignBtn.addEventListener('click', () => {
+                benignBtn.classList.add('active');
+                malignantBtn.classList.remove('active');
+                renderTumorInfo('benign');
+            });
+
+            malignantBtn.addEventListener('click', () => {
+                malignantBtn.classList.add('active');
+                benignBtn.classList.remove('active');
+                renderTumorInfo('malignant');
+            });
+            
+            // Section 2: Tumor Types
+            const tumorTypesGrid = document.getElementById('tumor-types-grid');
+            const filterBtns = document.querySelectorAll('.filter-btn');
+
+            function renderTumorTypes(filter = 'all') {
+                tumorTypesGrid.innerHTML = '';
+                let filteredTypes;
+                if (filter === 'all') {
+                    filteredTypes = data.tumorTypes;
+                } else {
+                    filteredTypes = data.tumorTypes.filter(t => t.category === filter);
+                }
+                
+                filteredTypes.forEach(type => {
+                    const card = document.createElement('div');
+                    card.className = 'content-card p-6 fade-in';
+                    card.innerHTML = `
+                        <h4 class="font-bold text-lg text-slate-800">${type.name}</h4>
+                        <p class="mt-2 text-sm text-slate-600">${type.desc}</p>
+                    `;
+                    tumorTypesGrid.appendChild(card);
+                });
+            }
+
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    renderTumorTypes(btn.dataset.filter);
+                });
+            });
+
+            // Section 2 Chart: Subtype Prognosis
+            const subtypeCtx = document.getElementById('subtypePrognosisChart').getContext('2d');
+            new Chart(subtypeCtx, {
+                type: 'bar',
+                data: data.subtypePrognosisData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false },
+                        tooltip: {
+                           callbacks: {
+                                label: function(context) {
+                                    return ` ${context.formattedValue}% 5-Year Survival`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: { display: true, text: '5-Year Breast Cancer-Specific Survival Rate (%)' }
+                        },
+                        y: {
+                            ticks: {
+                                autoSkip: false,
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    if (label.length > 20) {
+                                        return label.match(/.{1,20}/g);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Section 3: Risk & Prevention
+            const riskFactorsContainer = document.getElementById('risk-factors-container');
+            data.riskFactors.forEach(factor => {
+                const card = document.createElement('div');
+                card.className = 'content-card p-6';
+                card.innerHTML = `
+                    <h4 class="font-bold text-lg text-slate-800">${factor.title}</h4>
+                    <p class="mt-2 text-sm text-slate-600">${factor.description}</p>
+                `;
+                riskFactorsContainer.appendChild(card);
+            });
+            
+            const preventionContainer = document.getElementById('prevention-container');
+            data.preventionStrategies.forEach(strategy => {
+                const card = document.createElement('div');
+                card.className = 'content-card p-6';
+                card.innerHTML = `
+                    <h4 class="font-bold text-lg text-slate-800">${strategy.title}</h4>
+                    <p class="mt-2 text-sm text-slate-600">${strategy.description}</p>
+                `;
+                preventionContainer.appendChild(card);
+            });
+
+            // Section 4: Journey
+            const journeyBtns = document.querySelectorAll('.journey-btn');
+            const journeyContentDisplay = document.getElementById('journey-content-display');
+
+            function renderJourneyContent(contentKey) {
+                const content = data.journeyContent[contentKey];
+                let htmlContent = `<h4 class="text-xl font-bold text-slate-800 mb-2">${content.title}</h4>`;
+                htmlContent += `<p class="text-slate-600 mb-4">${content.text}</p>`;
+
+                if (contentKey === 'diagnosis' && content.table) {
+                    htmlContent += content.table;
+                }
+
+                if (contentKey === 'treatment' && content.details) {
+                    htmlContent += '<ul class="detail-list">';
+                    content.details.forEach(detail => {
+                        htmlContent += `<li><span class="font-semibold">${detail.name}:</span> ${detail.description}</li>`;
+                    });
+                    htmlContent += '</ul>';
+                }
+
+                journeyContentDisplay.innerHTML = htmlContent;
+            }
+
+            journeyBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    journeyBtns.forEach(b => b.classList.remove('bg-rose-200'));
+                    btn.classList.add('bg-rose-200');
+                    renderJourneyContent(btn.dataset.content);
+                });
+            });
+            
+            // Section 5: Prognosis
+            let prognosisChart; // Declare here so it's accessible within the scope
+
+            // Declare prognosisFilterBtns using 'let' and initialize it
+            let prognosisFilterBtns = document.querySelectorAll('.prognosis-filter-btn');
+
+            function createOrUpdatePrognosisChart(filter) {
+                const prognosisCanvas = document.getElementById('prognosisChart');
+                const prognosisCtx = prognosisCanvas ? prognosisCanvas.getContext('2d') : null; // Get context only if canvas exists
+                const prognosisTextContent = document.getElementById('prognosis-text-content'); // Get element here
+                const prognosisChartTitle = document.getElementById('prognosis-chart-title'); // Get element here
+
+                if (!prognosisTextContent || !prognosisChartTitle) {
+                    console.error("Prognosis text content or chart title element not found.");
+                    return; // Exit if elements aren't available
+                }
+
+                prognosisTextContent.innerHTML = ''; // Clear text content initially
+                
+                if (filter === 'statistics') {
+                    if (prognosisChart) {
+                        prognosisChart.destroy(); // Destroy chart if it exists
+                        prognosisChart = null;
+                    }
+                    if (prognosisCanvas) prognosisCanvas.style.display = 'none'; // Hide canvas for text-only view
+                    prognosisChartTitle.textContent = data.prognosisChartData.statistics.title;
+                    prognosisTextContent.innerHTML = data.prognosisChartData.statistics.text;
+                    return;
+                }
+
+                if (prognosisCanvas) prognosisCanvas.style.display = 'block'; // Show canvas for charts
+                if (!prognosisCtx) {
+                    console.error("Prognosis chart canvas or context not found.");
+                    return; // Exit if context isn't available
+                }
+
+                const chartData = data.prognosisChartData[filter];
+                prognosisChartTitle.textContent = chartData.title;
+                
+                const newChartData = {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: '5-Year Relative Survival Rate',
+                        data: chartData.data,
+                        backgroundColor: chartData.backgroundColor,
+                        borderColor: chartData.borderColor,
+                        borderWidth: 1
+                    }]
+                };
+
+                if (prognosisChart) {
+                    prognosisChart.data = newChartData;
+                    // No need to update options.plugins.title.text if it's display: false
+                    prognosisChart.update();
+                } else {
+                    prognosisChart = new Chart(prognosisCtx, {
+                        type: 'bar',
+                        data: newChartData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                             plugins: {
+                                legend: { display: false },
+                                title: { display: false }, // Title is handled by prognosisChartTitle div
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return ` ${context.formattedValue}% Survival`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    title: { display: true, text: '5-Year Relative Survival Rate (%)' }
+                                },
+                                x: {
+                                    ticks: {
+                                        autoSkip: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            prognosisFilterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    prognosisFilterBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    createOrUpdatePrognosisChart(btn.dataset.filter);
+                });
+            });
+
+            // Initial renders for relevant sections
+            renderTumorInfo('benign'); // For the Detailed Overview section (which has internal tabs)
+            renderTumorTypes('all'); // For the Tumor Types section
+            renderJourneyContent('symptoms'); // For the Diagnosis & Treatment Journey section
+            document.querySelector('.journey-btn[data-content="symptoms"]').classList.add('bg-rose-200'); // Activate default journey tab
+            createOrUpdatePrognosisChart('overall'); // For the Prognosis Explorer section
+            
+            // Active Nav Link on scroll
+            const sections = document.querySelectorAll('section');
+            const navLinks = document.querySelectorAll('.nav-link');
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 80) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').includes(current)) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+        });
+    </script>
+
+</body>
+</html>
